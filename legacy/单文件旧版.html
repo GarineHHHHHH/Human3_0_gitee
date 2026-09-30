@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human 3.0 人生战略控制台</title>
+<script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://unpkg.com/lucide@0.364.0/dist/umd/lucide.js"></script>
+<script>
+tailwind.config = {
+  theme: { extend: { colors: {
+    dark: { 900:'#0f1115', 800:'#1a1d24', 700:'#252932', border:'#334155' },
+    mind:'#3b82f6', bodyc:'#10b981', spirit:'#8b5cf6', vocation:'#f59e0b'
+  }}}
+}
+</script>
+<style>
+  body{font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#0f1115;color:#f8fafc;}
+  .md p{margin-bottom:.7rem;} .md p:last-child{margin-bottom:0;}
+  .md strong{color:#fff;font-weight:600;}
+  .md ul{list-style:disc;padding-left:1.25rem;margin-bottom:.7rem;}
+  .md ol{list-style:decimal;padding-left:1.25rem;margin-bottom:.7rem;}
+  .md li{margin-bottom:.25rem;}
+  .md h1,.md h2,.md h3{font-weight:600;color:#fff;margin:.9rem 0 .5rem;}
+  .md h3{font-size:1rem;} .md code{background:#0f1115;padding:.1rem .3rem;border-radius:4px;font-size:.85em;}
+  .md blockquote{border-left:3px solid #475569;padding-left:.75rem;color:#94a3b8;margin-bottom:.7rem;}
+  ::-webkit-scrollbar{width:7px;height:7px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#334155;border-radius:4px;}
+  ::-webkit-scrollbar-thumb:hover{background:#475569;}
+  .fade-enter-active,.fade-leave-active{transition:opacity .25s;}
+  .fade-enter-from,.fade-leave-to{opacity:0;}
+</style>
+</head>
+<body>
+
+<div id="app" class="h-screen flex flex-col overflow-hidden">
+
+  <!-- 顶栏 -->
+  <header class="bg-dark-800 border-b border-dark-border h-16 flex items-center justify-between px-6 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-spirit to-mind flex items-center justify-center font-bold text-white shadow-lg text-sm">H3</div>
+      <div>
+        <h1 class="text-base font-semibold leading-tight">Human 3.0 人生战略控制台</h1>
+        <p class="text-[11px] text-gray-500 leading-tight">Mind · Body · Spirit · Vocation</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="hidden md:flex items-center gap-1.5 text-[11px] text-gray-500 mr-1">
+        <span class="w-1.5 h-1.5 rounded-full" :class="config.apiKey ? 'bg-emerald-500' : 'bg-red-500'"></span>
+        {{ config.apiKey ? config.model : '未配置模型' }}
+      </span>
+      <button @click="showSettings = true" class="px-3 py-2 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2 text-sm text-gray-300">
+        <i data-lucide="settings" class="w-4 h-4"></i> 配置
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex overflow-hidden">
+
+    <!-- 左侧仪表盘 -->
+    <aside class="w-[360px] border-r border-dark-border bg-dark-800 flex flex-col overflow-y-auto shrink-0">
+      <div class="p-5 space-y-7">
+
+        <!-- 雷达图 -->
+        <div>
+          <h2 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <i data-lucide="radar" class="w-3.5 h-3.5"></i> 四象限实时评估
+          </h2>
+
+          <svg viewBox="0 0 240 240" class="w-full max-w-[250px] mx-auto block">
+            <!-- 环 -->
+            <polygon v-for="(ring,i) in [0.333,0.667,1]" :key="'r'+i"
+                     :points="ringPoints(ring)" fill="none" stroke="#334155" stroke-width="1"
+                     :stroke-dasharray="i===2 ? '0' : '3 3'"/>
+            <!-- 轴线 -->
+            <line v-for="(a,i) in axes" :key="'a'+i" x1="120" y1="120" :x2="a.x" :y2="a.y" stroke="#334155" stroke-width="1"/>
+            <!-- 刻度 L1 L2 L3 -->
+            <text v-for="(t,i) in scaleMarks" :key="'t'+i" :x="t.x" :y="t.y" fill="#64748b" font-size="9" font-family="monospace">{{ t.label }}</text>
+            <!-- 数据面 -->
+            <polygon :points="dataPoints" fill="rgba(59,130,246,0.18)" stroke="#60a5fa" stroke-width="2"
+                     stroke-linejoin="round" style="transition:all .7s cubic-bezier(.4,0,.2,1)"/>
+            <!-- 顶点 -->
+            <circle v-for="(v,i) in dataVertices" :key="'v'+i" :cx="v.x" :cy="v.y" r="4"
+                    :fill="v.color" stroke="#0f1115" stroke-width="2"
+                    style="transition:all .7s cubic-bezier(.4,0,.2,1)"/>
+            <!-- 轴标签 -->
+            <text v-for="(l,i) in axisLabels" :key="'l'+i" :x="l.x" :y="l.y" :fill="l.color"
+                  font-size="11" font-weight="600" text-anchor="middle">{{ l.label }}</text>
+          </svg>
+
+          <!-- 等级徽章 -->
+          <div class="grid grid-cols-4 gap-2 mt-5">
+            <div v-for="q in quadrantMeta" :key="q.key" class="text-center">
+              <div class="text-[10px] text-gray-500 mb-1">{{ q.short }}</div>
+              <div class="text-sm font-bold font-mono" :style="{color:q.color}">L{{ scores[q.key].toFixed(1) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 进度条明细 -->
+        <div class="space-y-3.5">
+          <score-bar v-for="q in quadrantMeta" :key="q.key" :name="q.name" :score="scores[q.key]" :color="q.bar"></score-bar>
+        </div>
+
+        <!-- 路线建议 -->
+        <div>
+          <h2 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <i data-lucide="route" class="w-3.5 h-3.5"></i> 战略路线建议
+          </h2>
+          <div v-if="roadmap.length" class="space-y-2.5">
+            <div v-for="(item,i) in roadmap" :key="i" class="bg-dark-700 border border-dark-border rounded-lg p-3.5 text-[13px]">
+              <div class="flex items-start gap-2.5">
+                <span class="text-vocation mt-0.5 shrink-0"><i data-lucide="target" class="w-3.5 h-3.5"></i></span>
+                <div class="text-gray-200 md leading-snug" v-html="md(item)"></div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-[13px] text-gray-500 italic p-4 bg-dark-700/40 rounded-lg border border-dashed border-dark-border">
+            通过与顾问对话，你的专属破局路线将在此生成。
+          </div>
+        </div>
+
+        <!-- 成长档案 -->
+        <div class="pb-4">
+          <h2 class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <i data-lucide="history" class="w-3.5 h-3.5"></i> 个人成长档案
+          </h2>
+          <div class="relative pl-3.5 border-l-2 border-dark-border space-y-5">
+            <div v-for="(ev,i) in timeline" :key="i" class="relative">
+              <div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-dark-800 border-2 border-vocation"></div>
+              <div class="text-[11px] text-gray-500 mb-1">{{ ev.date }}</div>
+              <div class="text-[13px] text-gray-200 leading-snug">{{ ev.content }}</div>
+            </div>
+            <div v-if="!timeline.length" class="text-[13px] text-gray-500 italic">你的认知突破将在此自动归档。</div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- 右侧对话 -->
+    <section class="flex-1 flex flex-col bg-dark-900 min-w-0">
+      <div class="flex-1 overflow-y-auto p-6 space-y-6" id="chat-container" ref="chatContainer">
+        <div v-if="!messages.length" class="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-60">
+          <i data-lucide="compass" class="w-12 h-12 text-gray-600"></i>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            开始与你的专属人生战略顾问对话<br>
+            <span class="text-gray-600 text-xs">顾问会一次只问一个问题，并实时更新左侧的评估与路线</span>
+          </p>
+        </div>
+
+        <div v-for="(msg,i) in messages" :key="i" class="flex gap-3.5 max-w-[88%]"
+             :class="msg.role==='user' ? 'ml-auto flex-row-reverse' : 'mr-auto'">
+          <div class="shrink-0 mt-1">
+            <div v-if="msg.role==='assistant'" class="w-8 h-8 rounded-lg bg-gradient-to-br from-spirit to-mind flex items-center justify-center shadow-md">
+              <i data-lucide="bot" class="w-4 h-4 text-white"></i>
+            </div>
+            <div v-else class="w-8 h-8 rounded-lg bg-dark-700 border border-dark-border flex items-center justify-center shadow-md">
+              <i data-lucide="user" class="w-4 h-4 text-gray-300"></i>
+            </div>
+          </div>
+          <div class="px-4 py-3 rounded-2xl text-[14px] md leading-relaxed min-w-0 break-words"
+               :class="msg.role==='user'
+                 ? 'bg-dark-700 text-white rounded-tr-sm'
+                 : 'bg-dark-800 border border-dark-border text-gray-200 rounded-tl-sm'"
+               v-html="md(msg.content)"></div>
+        </div>
+
+        <div v-if="errorMsg" class="mr-auto max-w-[88%] flex gap-3.5">
+          <div class="shrink-0 mt-1">
+            <div class="w-8 h-8 rounded-lg border flex items-center justify-center"
+                 :class="isNotice ? 'bg-amber-900/40 border-amber-800' : 'bg-red-900/50 border-red-800'">
+              <i :data-lucide="isNotice ? 'info' : 'alert-triangle'" class="w-4 h-4"
+                 :class="isNotice ? 'text-amber-400' : 'text-red-400'"></i>
+            </div>
+          </div>
+          <div class="px-4 py-3 rounded-2xl rounded-tl-sm border text-[13px] leading-relaxed min-w-0"
+               :class="isNotice ? 'bg-amber-950/25 border-amber-900/50 text-amber-200' : 'bg-red-950/40 border-red-900/60 text-red-200'">
+            <div>{{ errorMsg }}</div>
+            <button v-if="lastRaw" @click="debugOpen = !debugOpen"
+                    class="mt-2.5 text-[11px] opacity-80 hover:opacity-100 underline underline-offset-2">
+              {{ debugOpen ? '收起原始返回' : '查看原始返回（排查用）' }}
+            </button>
+            <pre v-if="debugOpen && lastRaw"
+                 class="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all bg-black/50 rounded-lg p-2.5 text-[11px] text-gray-400 leading-relaxed">{{ lastRaw }}</pre>
+          </div>
+        </div>
+
+        <div v-if="isLoading" class="flex gap-3.5 mr-auto">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-spirit to-mind flex items-center justify-center shrink-0 mt-1">
+            <i data-lucide="bot" class="w-4 h-4 text-white"></i>
+          </div>
+          <div class="px-4 py-3.5 rounded-2xl rounded-tl-sm bg-dark-800 border border-dark-border flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></span>
+            <span class="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style="animation-delay:.15s"></span>
+            <span class="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style="animation-delay:.3s"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 输入区 -->
+      <div class="p-4 bg-dark-800 border-t border-dark-border shrink-0">
+        <div class="max-w-4xl mx-auto">
+          <div class="flex items-end gap-2 bg-dark-900 border border-dark-border rounded-xl p-2 focus-within:border-mind/70 transition-colors">
+            <textarea v-model="inputBox" @keydown.enter.exact.prevent="sendMessage" rows="1"
+                      placeholder="描述你的现状、困惑或进展…（Enter 发送 / Shift+Enter 换行）"
+                      class="w-full bg-transparent text-white placeholder-gray-500 resize-none outline-none py-2 px-2.5 text-[14px] max-h-32 overflow-y-auto"
+                      @input="autoGrow" ref="textareaRef"></textarea>
+            <button @click="sendMessage" :disabled="!inputBox.trim() || isLoading || !config.apiKey"
+                    class="p-2.5 rounded-lg bg-mind text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-colors">
+              <i data-lucide="send" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <div class="flex items-center justify-between mt-2 px-1">
+            <span class="text-[11px] text-gray-600">{{ messages.length ? '对话与评估已自动保存在本地浏览器' : '' }}</span>
+            <span v-if="!config.apiKey" class="text-[11px] text-red-400 flex items-center gap-1">
+              <i data-lucide="alert-circle" class="w-3 h-3"></i> 请先配置 API Key
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 配置弹窗 -->
+  <transition name="fade">
+  <div v-if="showSettings" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-dark-800 border border-dark-border rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-base font-semibold flex items-center gap-2">
+          <i data-lucide="settings-2" class="w-4 h-4 text-gray-400"></i> 大模型配置
+        </h3>
+        <button @click="showSettings = false" class="text-gray-400 hover:text-white p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1.5">API Base URL</label>
+          <input v-model.trim="config.baseUrl" type="text"
+                 class="w-full bg-dark-900 border border-dark-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-mind"
+                 placeholder="https://api.deepseek.com/v1">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1.5">API Key</label>
+          <input v-model.trim="config.apiKey" type="password"
+                 class="w-full bg-dark-900 border border-dark-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-mind"
+                 placeholder="sk-...">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1.5">模型名称</label>
+          <input v-model.trim="config.model" type="text"
+                 class="w-full bg-dark-900 border border-dark-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-mind"
+                 placeholder="deepseek-chat">
+        </div>
+        <label class="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+          <input type="checkbox" v-model="config.jsonMode" class="w-4 h-4 accent-blue-500 rounded bg-dark-900 border-dark-border">
+          <span class="text-xs text-gray-400">启用 JSON 模式（推荐，接口不支持时请关闭）</span>
+        </label>
+        <p class="text-[11px] text-gray-600 leading-relaxed">
+          配置仅保存在你本机浏览器的 localStorage 中，不会上传到任何第三方服务器，接口请求由浏览器直接发往你填写的地址。
+        </p>
+      </div>
+
+      <div v-if="testResult" class="mt-4 text-[12px] leading-relaxed rounded-lg p-3 border"
+           :class="testResult.startsWith('✅') ? 'bg-emerald-950/40 border-emerald-900/60 text-emerald-200' : testResult.startsWith('⚠️') ? 'bg-amber-950/40 border-amber-900/60 text-amber-200' : 'bg-red-950/40 border-red-900/60 text-red-200'">
+        {{ testResult }}
+      </div>
+
+      <div class="mt-6 flex items-center gap-3">
+        <button @click="clearAll" class="px-3.5 py-2 rounded-lg bg-red-950/50 text-red-400 hover:bg-red-900/60 text-xs border border-red-900/60 transition-colors">
+          清空历史与数据
+        </button>
+        <div class="flex-1"></div>
+        <button @click="testConnection" :disabled="testing"
+                class="px-3.5 py-2 rounded-lg border border-dark-border text-gray-300 hover:bg-dark-700 disabled:opacity-50 text-sm transition-colors flex items-center gap-1.5">
+          <span v-if="testing" class="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></span>
+          {{ testing ? '测试中' : '测试连接' }}
+        </button>
+        <button @click="showSettings = false" class="px-4 py-2 rounded-lg text-gray-400 hover:text-white text-sm transition-colors">取消</button>
+        <button @click="saveConfig" class="px-5 py-2 rounded-lg bg-mind text-white hover:bg-blue-500 text-sm transition-colors">保存</button>
+      </div>
+    </div>
+  </div>
+  </transition>
+</div>
+
+<script type="text/x-template" id="score-bar-tpl">
+  <div>
+    <div class="flex justify-between items-baseline mb-1.5">
+      <span class="text-[13px] text-gray-300">{{ name }}</span>
+      <span class="text-[11px] font-mono font-bold" :style="{color: levelColor}">L{{ Number(score).toFixed(1) }} · {{ phase }}</span>
+    </div>
+    <div class="h-1.5 w-full bg-dark-900 rounded-full overflow-hidden">
+      <div class="h-full rounded-full transition-all duration-700 ease-out" :class="color"
+           :style="{ width: Math.min(Number(score)/3*100,100) + '%' }"></div>
+    </div>
+  </div>
+</script>
+
+<script>
+const { createApp, ref, reactive, onMounted, nextTick, computed } = Vue;
+
+/* ============ 顾问系统提示词 ============ */
+const SYSTEM_PROMPT = `你是基于 Dan Koe "Human 3.0" 模型的中文人生战略顾问。你正在一个交互式页面中与用户对话，你的结构化输出会实时驱动页面左侧的评估面板。
+
+【工作方式】
+1. 像专业的人生战略顾问一样，每次只问 1 个最重要的问题，然后根据回答继续追问。
+2. 语气礼貌、尊重、克制，不说教、不堆砌鸡汤。用户提到具体的经历时，要先复述你的观察，再提问。
+3. 重点识别：用户真正想要的人生、行为与目标之间的矛盾、反复拖延和逃避的问题、限制他的生活习惯/身份认同/环境。
+4. 评估四个象限（每项 1.0 - 3.0 的小数）：
+   - mind 心智：认知、情绪、思维模式、自我意识
+   - body 身体：睡眠、健康、运动、精力
+   - spirit 精神：价值观、人际关系、人生方向
+   - vocation 事业：工作、收入、技能、商业能力、自由度
+   评分含义：1.0-1.6 = L1（无意识/被系统支配），1.7-2.3 = L2（有意识参与但仍受规则束缚），2.4-3.0 = L3（自主创造、设计自己的系统）。
+   评分必须只依据对话中获得的实际证据，不要凭空抬高或压低；没有新信息时保持原值。
+
+【输出格式 — 必须严格遵守】
+只输出一个合法的 JSON 对象，不要输出任何解释、前言、思考过程或 Markdown 代码块围栏。直接以 { 开头、以 } 结尾。字符串内的换行必须转义为 \\n。
+reply 请控制在 800 字以内，roadmap 每条不超过 30 字，务必保证 JSON 语法完整闭合（结尾有 }）。
+{
+  "reply": "给用户的回复正文，可使用 Markdown，包含你的观察与那 1 个提问",
+  "scores": { "mind": 1.8, "body": 2.0, "spirit": 1.6, "vocation": 1.4 },
+  "roadmap": ["一句话行动建议（结论先行、可当天执行）", "最多 4 条，替换而非累加"],
+  "timeline_event": "本次对话若产生了新的认知突破，用一句不超过 30 字的话概括；否则填空字符串"
+}`;
+
+const clamp = (n) => Math.max(1, Math.min(3, Number(n) || 1));
+
+const app = createApp({
+  setup() {
+    const showSettings = ref(false);
+    const config = reactive({
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: '',
+      model: 'deepseek-chat',
+      jsonMode: true
+    });
+
+    const messages = ref([]);                       // 仅纯文本，用于展示与作为上下文
+    const scores = reactive({ mind:1, body:1, spirit:1, vocation:1 });
+    const roadmap = ref([]);
+    const timeline = ref([]);
+
+    const inputBox = ref('');
+    const isLoading = ref(false);
+    const errorMsg = ref('');
+    const lastRaw = ref('');
+    const debugOpen = ref(false);
+    const testing = ref(false);
+    const testResult = ref('');
+    const textareaRef = ref(null);
+    const chatContainer = ref(null);
+
+    const isNotice = computed(() => String(errorMsg.value || '').startsWith('提示'));
+
+    const quadrantMeta = [
+      { key:'mind',     name:'心智 Mind',     short:'心智', color:'#3b82f6', bar:'bg-mind' },
+      { key:'body',     name:'身体 Body',     short:'身体', color:'#10b981', bar:'bg-bodyc' },
+      { key:'spirit',   name:'精神 Spirit',   short:'精神', color:'#8b5cf6', bar:'bg-spirit' },
+      { key:'vocation', name:'事业 Vocation', short:'事业', color:'#f59e0b', bar:'bg-vocation' }
+    ];
+    const AXIS_COLOR = ['#3b82f6','#10b981','#8b5cf6','#f59e0b'];
+
+    /* ---------- 雷达图几何 ---------- */
+    const CX = 120, CY = 120, R = 76;
+    const pt = (ratio, i) => {
+      const ang = (-90 + i * 90) * Math.PI / 180;
+      return { x: CX + R * ratio * Math.cos(ang), y: CY + R * ratio * Math.sin(ang) };
+    };
+    const ringPoints = (ratio) =>
+      [0,1,2,3].map(i => { const p = pt(ratio,i); return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' ');
+
+    const axes = computed(() => [0,1,2,3].map(i => pt(1,i)));
+    const dataPoints = computed(() => quadrantMeta
+      .map((q,i) => { const p = pt(clamp(scores[q.key])/3, i); return p.x.toFixed(1)+','+p.y.toFixed(1); })
+      .join(' '));
+    const dataVertices = computed(() => quadrantMeta
+      .map((q,i) => { const p = pt(clamp(scores[q.key])/3, i); return { ...p, color: AXIS_COLOR[i] }; }));
+    const scaleMarks = computed(() =>
+      [1,2,3].map(lv => { const p = pt(lv/3, 0); return { x: p.x + 5, y: p.y + 3, label: 'L'+lv }; }));
+    const axisLabels = computed(() => [
+      { label:'心智', color:'#60a5fa' },
+      { label:'身体', color:'#34d399' },
+      { label:'精神', color:'#a78bfa' },
+      { label:'事业', color:'#fbbf24' }
+    ].map((l,i) => { const p = pt(1.26, i); return { ...l, x: p.x, y: p.y + 4 }; }));
+
+    /* ---------- 工具 ---------- */
+    const md = (t) => { try { return marked.parse(t || ''); } catch { return t || ''; } };
+    const nowStr = () => { const d = new Date(); return `${d.getMonth()+1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+
+    // 从可能的脏输出中提取 JSON（含 ```json 围栏、前后废话）
+    const extractJSON = (raw) => {
+      if (!raw) return null;
+      let s = String(raw).trim();
+      s = s.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+      try { return JSON.parse(s); } catch {}
+      const start = s.indexOf('{');
+      const end = s.lastIndexOf('}');
+      if (start !== -1 && end > start) {
+        try { return JSON.parse(s.slice(start, end + 1)); } catch {}
+      }
+      return null;
+    };
+
+    // 兼容旧版本 localStorage：把历史上存成 JSON 串的 assistant 消息还原为纯文本，
+    // 并把其中的结构化数据抽出来（返回 snap，由调用方决定是否覆盖当前面板）
+    const migrate = (list) => {
+      const out = [];
+      const snap = { scores: {}, roadmap: null, timeline: [] };
+      (Array.isArray(list) ? list : []).forEach(m => {
+        if (!m || (m.role !== 'user' && m.role !== 'assistant')) return;
+        if (m.role === 'assistant') {
+          const p = extractJSON(m.content);
+          if (p && typeof p.reply === 'string') {
+            if (p.scores) ['mind','body','spirit','vocation'].forEach(k => {
+              if (p.scores[k] != null) snap.scores[k] = clamp(p.scores[k]);
+            });
+            if (Array.isArray(p.roadmap)) {
+              const r = p.roadmap.filter(x => typeof x === 'string' && x.trim());
+              if (r.length) snap.roadmap = r.slice(0, 4);
+            }
+            const ev = typeof p.timeline_event === 'string' ? p.timeline_event.trim() : '';
+            if (ev) snap.timeline.push(ev);
+            out.push({ ...m, content: p.reply });
+            return;
+          }
+        }
+        out.push(m);
+      });
+      return { list: out, snap };
+    };
+
+    const persist = () => localStorage.setItem('h3_data', JSON.stringify({
+      messages: messages.value, scores: { ...scores }, roadmap: roadmap.value, timeline: timeline.value
+    }));
+
+    const autoGrow = () => {
+      const el = textareaRef.value; if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 128) + 'px';
+    };
+    const scrollDown = () => nextTick(() => {
+      const el = chatContainer.value;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+
+    /* ---------- 生命周期：载入本地数据 ---------- */
+    onMounted(() => {
+      const c = localStorage.getItem('h3_config');
+      if (c) { try { Object.assign(config, JSON.parse(c)); } catch {} } else { showSettings.value = true; }
+
+      const d = localStorage.getItem('h3_data');
+      if (d) {
+        try {
+          const data = JSON.parse(d);
+          const { list, snap } = migrate(data.messages);
+          messages.value = list;
+          if (data.scores) Object.assign(scores, {
+            mind: clamp(data.scores.mind), body: clamp(data.scores.body),
+            spirit: clamp(data.scores.spirit), vocation: clamp(data.scores.vocation)
+          });
+          // 迁移出来的结构化数据优先于旧快照（旧版本曾把 JSON 整体存进对话历史）
+          ['mind','body','spirit','vocation'].forEach(k => { if (snap.scores[k] != null) scores[k] = snap.scores[k]; });
+          roadmap.value = snap.roadmap || (Array.isArray(data.roadmap) ? data.roadmap : []);
+          const base = Array.isArray(data.timeline) ? data.timeline : [];
+          timeline.value = snap.timeline.length
+            ? [...snap.timeline.map(c => ({ date: '历史归档', content: c })), ...base]
+            : base;
+        } catch (e) { console.warn('本地数据损坏，已忽略', e); }
+      }
+      nextTick(() => { lucide.createIcons(); scrollDown(); });
+    });
+
+    /* ---------- 配置 ---------- */
+    const saveConfig = () => {
+      if (!/^https?:\/\//i.test(config.baseUrl)) config.baseUrl = 'https://api.deepseek.com/v1';
+      localStorage.setItem('h3_config', JSON.stringify(config));
+      showSettings.value = false;
+      errorMsg.value = '';
+    };
+    const clearAll = () => {
+      if (!confirm('确定要清空所有对话历史与评估数据吗？此操作不可撤销。')) return;
+      messages.value = []; roadmap.value = []; timeline.value = []; errorMsg.value = '';
+      lastRaw.value = ''; debugOpen.value = false;
+      Object.assign(scores, { mind:1, body:1, spirit:1, vocation:1 });
+      localStorage.removeItem('h3_data');
+      showSettings.value = false;
+    };
+
+    /* ---------- 连接测试（配置弹窗内） ---------- */
+    const testConnection = async () => {
+      testResult.value = '';
+      if (!config.apiKey.trim()) { testResult.value = '⚠️ 请先填写 API Key'; return; }
+      if (!/^https?:\/\//i.test(config.baseUrl)) { testResult.value = '⚠️ Base URL 必须以 http:// 或 https:// 开头'; return; }
+      testing.value = true;
+      try {
+        const res = await fetch(config.baseUrl.replace(/\/+$/,'') + '/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+          body: JSON.stringify({
+            model: config.model,
+            messages: [{ role: 'user', content: '请只回复两个字：正常' }],
+            max_tokens: 32
+          })
+        });
+        const body = await res.text();
+        if (!res.ok) { testResult.value = `❌ HTTP ${res.status} ${res.statusText}：${body.slice(0, 300)}`; return; }
+        let data = null; try { data = JSON.parse(body); } catch {}
+        const t = pickText(data);
+        testResult.value = t.trim()
+          ? `✅ 连接成功，模型回复：「${t.trim().slice(0, 60)}」`
+          : `⚠️ 请求成功但内容为空。原始返回：${body.slice(0, 300)} → 建议关闭「JSON 模式」再试`;
+      } catch (e) {
+        testResult.value = `❌ 请求失败：${e.message}（通常是 Base URL 错误、Key 无效，或该接口不允许浏览器直连/CORS 限制）`;
+      } finally {
+        testing.value = false;
+        nextTick(() => lucide.createIcons());
+      }
+    };
+
+    /* ---------- 调用模型 ---------- */
+    const endpointOf = () => config.baseUrl.replace(/\/+$/,'') + '/chat/completions';
+
+    // 兼容各种返回形态，把模型的文本抠出来（message.content / text / 数组块 / reasoning_content）
+    const pickText = (data) => {
+      const ch = data && Array.isArray(data.choices) ? data.choices[0] : null;
+      let c = (ch && ch.message && ch.message.content) ;
+      if (c == null && ch && ch.text != null) c = ch.text;
+      if (c == null && data && data.output_text != null) c = data.output_text;
+      if (c == null && data && data.content != null) c = data.content;
+      if (Array.isArray(c)) c = c.map(b => typeof b === 'string' ? b : (b && (b.text != null ? b.text : b.content)) || '').join('');
+      if (typeof c !== 'string') c = '';
+      if (!c.trim() && ch && ch.message) {
+        const rc = ch.message.reasoning_content != null ? ch.message.reasoning_content : ch.message.reasoning;
+        if (typeof rc === 'string' && rc.trim()) c = rc;
+      }
+      return c;
+    };
+
+    const stateSnapshot = () => ({
+      scores: { mind:+scores.mind.toFixed(1), body:+scores.body.toFixed(1), spirit:+scores.spirit.toFixed(1), vocation:+scores.vocation.toFixed(1) },
+      roadmap: roadmap.value,
+      timeline: timeline.value.map(t => t.content)
+    });
+
+    const callOnce = async (withJsonMode) => {
+      const sys = SYSTEM_PROMPT + `\n\n【用户当前的评估快照】\n${JSON.stringify(stateSnapshot())}`;
+      const res = await fetch(endpointOf(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [
+            { role: 'system', content: sys },
+            ...messages.value.map(m => ({ role: m.role, content: m.content }))
+          ],
+          temperature: 0.7,
+          ...(withJsonMode ? { response_format: { type: 'json_object' } } : {})
+        })
+      });
+      const httpBody = await res.text();
+      let data = null;
+      try { data = JSON.parse(httpBody); } catch {}
+      return { ok: res.ok, status: res.status, statusText: res.statusText, httpBody, data, raw: pickText(data), usedJsonMode: withJsonMode };
+    };
+
+    const callModel = async () => {
+      let r = await callOnce(config.jsonMode);
+
+      // ① 接口不支持 response_format（400/404/422/500）→ 摘掉该参数重试
+      if (!r.ok && config.jsonMode && [400,404,422,500].includes(r.status)) {
+        r = await callOnce(false);
+      }
+      if (!r.ok) {
+        const detail = String(r.httpBody || '').slice(0, 400);
+        const e = new Error(`接口返回 ${r.status} ${r.statusText}${detail ? '：' + detail : ''}`);
+        e.httpBody = r.httpBody;
+        throw e;
+      }
+
+      let parsed = extractJSON(r.raw);
+
+      // ② 内容为空或不是 JSON → 摘掉 JSON 模式再要一次（很多中转接口在该模式下会返回空）
+      if (!parsed && (r.usedJsonMode || !String(r.raw || '').trim())) {
+        const r2 = await callOnce(false).catch(() => null);
+        if (r2 && r2.ok) {
+          const p2 = extractJSON(r2.raw);
+          if (p2) { parsed = p2; r = r2; }
+          else if (String(r2.raw || '').trim()) { r = r2; }
+        }
+      }
+
+      return { parsed, raw: r.raw, httpBody: r.httpBody };
+    };
+
+    // 模型没按 JSON 返回时，尽力从原文里取出可读文本，而不是直接说“没有返回内容”
+    const readableText = (raw) => {
+      let s = String(raw || '').trim();
+      if (!s) return '';
+      s = s.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+      if (s.startsWith('{') || s.startsWith('[')) {
+        const p = extractJSON(s);
+        if (p && typeof p === 'object' && !Array.isArray(p)) {
+          const cand = p.reply != null ? p.reply : (p.message != null ? p.message : (p.content != null ? p.content : p.text));
+          if (typeof cand === 'string' && cand.trim()) return cand;
+          let best = '';
+          Object.keys(p).forEach(k => { if (typeof p[k] === 'string' && p[k].length > best.length) best = p[k]; });
+          if (best.trim()) return best;
+        }
+        return '';
+      }
+      return s;
+    };
+
+    const sendMessage = async () => {
+      const text = inputBox.value.trim();
+      if (!text || isLoading.value || !config.apiKey) return;
+
+      errorMsg.value = '';
+      messages.value.push({ role:'user', content: text });
+      inputBox.value = '';
+      nextTick(autoGrow);
+      scrollDown();
+      persist();   // 先落盘用户输入，避免请求失败时丢失
+
+      isLoading.value = true;
+      try {
+        const { parsed, raw, httpBody } = await callModel();
+        lastRaw.value = httpBody || '';
+
+        if (parsed && typeof parsed.reply === 'string' && parsed.reply.trim()) {
+          // 1) 聊天历史里只存纯文本 reply —— 杜绝 JSON 出现在气泡里
+          messages.value.push({ role:'assistant', content: parsed.reply });
+
+          // 2) 结构化数据只用于驱动左侧面板
+          if (parsed.scores && typeof parsed.scores === 'object') {
+            ['mind','body','spirit','vocation'].forEach(k => {
+              if (parsed.scores[k] != null) scores[k] = clamp(parsed.scores[k]);
+            });
+          }
+          if (Array.isArray(parsed.roadmap) && parsed.roadmap.length) {
+            roadmap.value = parsed.roadmap.filter(x => typeof x === 'string' && x.trim()).slice(0, 4);
+          }
+          const ev = typeof parsed.timeline_event === 'string' ? parsed.timeline_event.trim() : '';
+          if (ev) timeline.value.unshift({ date: nowStr(), content: ev });
+          errorMsg.value = '';
+        } else {
+          // 模型没按 JSON 返回：尽力把可读文本呈现给用户，面板保持原值
+          const text = readableText(raw);
+          if (text) {
+            messages.value.push({ role:'assistant', content: text });
+            errorMsg.value = '提示：本次回复未包含结构化数据，左侧面板保持原值（对话不受影响）。若反复出现，点「查看原始返回」核对接口输出。';
+          } else {
+            errorMsg.value = '接口返回内容为空。常见原因：① 中转/兼容接口不支持 response_format；② 模型名称填错；③ 该模型只输出 reasoning 内容。请点「查看原始返回」核对，或在配置中关闭「JSON 模式」后重试。';
+          }
+          debugOpen.value = true;
+        }
+        persist();
+      } catch (err) {
+        lastRaw.value = err.httpBody || '';
+        errorMsg.value = `请求失败：${err.message}`;
+        if (err.httpBody) debugOpen.value = true;
+      } finally {
+        isLoading.value = false;
+        nextTick(() => { lucide.createIcons(); scrollDown(); });
+      }
+    };
+
+    return {
+      showSettings, config, saveConfig, clearAll, testConnection, testing, testResult,
+      messages, scores, roadmap, timeline, quadrantMeta,
+      inputBox, isLoading, errorMsg, lastRaw, debugOpen, isNotice, textareaRef, chatContainer,
+      ringPoints, axes, dataPoints, dataVertices, scaleMarks, axisLabels,
+      md, autoGrow, sendMessage
+    };
+  }
+});
+
+app.component('score-bar', {
+  template: '#score-bar-tpl',
+  props: ['name','score','color'],
+  computed: {
+    p() { const s = Number(this.score) || 1; return s < 1.67 ? { n:'L1 · 生存', c:'#94a3b8' } : s < 2.34 ? { n:'L2 · 玩家', c:'#cbd5e1' } : { n:'L3 · 创造者', c:'#e2e8f0' }; },
+    phase() { return this.p.n.split(' · ')[1]; },
+    levelColor() { return this.p.c; }
+  }
+});
+
+app.mount('#app');
+</script>
+</body>
+</html>

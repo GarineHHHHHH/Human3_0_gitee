@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Human 3.0 人生战略控制台</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%238b5cf6'/><text x='16' y='22' font-size='14' fill='white' text-anchor='middle' font-family='sans-serif'>H3</text></svg>">
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= 顶栏 ================= -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">H3</div>
+      <div>
+        <div class="brand-title" id="sessionTitle">Human 3.0 人生战略控制台</div>
+        <div class="brand-sub">Mind · Body · Spirit · Vocation &nbsp;|&nbsp; 双击标题可重命名对话</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">连接中…</span>
+        <span class="dot idle" id="analysisDot" title="评估状态"></span>
+      </div>
+      <button class="btn ghost" id="btnNew"></button>
+      <button class="btn ghost" id="btnGear"></button>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- ================= 左侧仪表盘 ================= -->
+    <aside class="sidebar">
+      <div class="sidebar-inner">
+
+        <section>
+          <div class="sec-title"><span id="secSessionsIcon"></span> 对话档案</div>
+          <div class="session-list" id="sessions"></div>
+        </section>
+
+        <section>
+          <div class="sec-title"><span id="secRadarIcon"></span> 四象限评估</div>
+          <div class="radar-wrap" id="radar"></div>
+          <div class="badge-row" id="badges"></div>
+          <div class="bars" id="bars"></div>
+        </section>
+
+        <section>
+          <div class="sec-title"><span id="secTrendIcon"></span> 成长曲线 <span class="hint">按对话轮次</span></div>
+          <div class="trend-wrap">
+            <div id="trend"></div>
+            <div class="trend-legend" id="legend"></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-title"><span id="secRouteIcon"></span> 战略路线建议</div>
+          <div class="roadmap" id="roadmap"></div>
+        </section>
+
+        <section>
+          <div class="sec-title"><span id="secHistIcon"></span> 认知突破档案</div>
+          <div class="timeline" id="timeline"></div>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- ================= 右侧对话 ================= -->
+    <section class="chat">
+      <div class="chat-scroll" id="messages"></div>
+      <div class="composer">
+        <div class="composer-inner">
+          <div class="input-shell">
+            <textarea id="input" rows="1" placeholder="描述你的现状、困惑或进展…（Enter 发送 / Shift+Enter 换行）"></textarea>
+            <button class="send-btn" id="send" title="发送"></button>
+          </div>
+          <div class="composer-foot">
+            <span id="composerHint">对话与评估会保存在本地服务端 data/sessions.json</span>
+            <span>Ctrl + K 新建对话</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ================= 设置弹窗 ================= -->
+<div class="overlay" id="overlay" style="display:none">
+  <div class="modal">
+    <h3>大模型设置 <button class="btn sm" id="btnClose">关闭</button></h3>
+
+    <div class="field">
+      <label>API Base URL</label>
+      <input type="text" id="cfgBase" placeholder="https://api.deepseek.com/v1">
+      <div class="tip">兼容 OpenAI 格式的地址，末尾会自动补 /chat/completions</div>
+    </div>
+
+    <div class="field">
+      <label>API Key</label>
+      <input type="password" id="cfgKey" placeholder="sk-...">
+      <div class="tip">保存在本机 config.json，不会上传到任何第三方</div>
+    </div>
+
+    <div class="field">
+      <label>对话模型</label>
+      <input type="text" id="cfgModel" placeholder="deepseek-chat">
+    </div>
+
+    <div class="field">
+      <label>评估模型（可选）</label>
+      <input type="text" id="cfgAnalyst" placeholder="留空则与对话模型相同">
+      <div class="tip">评估是每轮一次的独立小请求，填一个更便宜/更快的模型可以降低成本</div>
+    </div>
+
+    <div class="field">
+      <label>温度 temperature</label>
+      <input type="number" id="cfgTemp" step="0.1" min="0" max="2" placeholder="0.7">
+    </div>
+
+    <label class="check"><input type="checkbox" id="cfgAnalyze"><span>自动分析四象限评分与路线（推荐）</span></label>
+    <label class="check"><input type="checkbox" id="cfgJson"><span>评估请求使用 JSON 模式（接口不支持时请关闭）</span></label>
+
+    <div class="result" id="cfgResult" style="display:none"></div>
+
+    <div class="modal-foot">
+      <button class="btn danger sm" id="btnDelete">删除当前对话</button>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="btnTest">测试连接</button>
+      <button class="btn primary sm" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

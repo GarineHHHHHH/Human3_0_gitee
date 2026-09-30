@@ -1,0 +1,10 @@
+{
+  "base_url": "https://api.deepseek.com/v1",
+  "api_key": "sk-47e45a2c2e914093bf8d1123d4d3a5a0",
+  "model": "deepseek-chat",
+  "analyst_model": "",
+  "temperature": 0.7,
+  "timeout": 180,
+  "auto_analyze": true,
+  "json_mode": true
+}
